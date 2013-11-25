@@ -1,4 +1,4 @@
 stepdance
 =========
 
-Functional iterators written Scala for easy and elegant parsing, scanning, iterating etc.
+Functional iterators for easy and elegant parsing, scanning, iterating etc. Written in Scala.
