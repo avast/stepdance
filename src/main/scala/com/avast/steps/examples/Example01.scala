@@ -16,14 +16,18 @@ class Example01 extends StepDanceExample {
     lazy val input = new BufferedReader(new FileReader(sourceFile))
     val scanner = buildSteps {
       input.readLine()
-    }.finishWith {
+    }.closeWith {
       input.close()
-      println("Closed")
     }.build()
 
     // scan
-    for (line <- scanner) {
-      println(line)
+    try {
+      for (line <- scanner) {
+        println(line)
+      }
+    }
+    finally {
+      scanner.close()
     }
   }
 

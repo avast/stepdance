@@ -1,5 +1,7 @@
 package com.avast.steps.examples
 
+import com.avast.steps.NoStep
+
 
 /**
  * StepDance: Basic Usage
@@ -11,7 +13,9 @@ class Example04 extends StepDanceExample {
    */
   def example() {
     val scanner = openScanner(source)
-      .connect(_ => openScanner(source2))
+      .connect(s => if (s.value == Some("--------")) {
+      openScanner(source2)
+    } else NoStep)
       .map("//" + _)
 
     for (line <- scanner) {

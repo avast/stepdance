@@ -31,7 +31,7 @@ abstract class StepDanceExample {
       lazy val input = new BufferedReader(new InputStreamReader(new URL(source).openStream()))
       buildSteps {
         input.readLine()
-      }.finishWith {
+      }.closeWith {
         input.close()
       }.build()
     }
@@ -82,7 +82,7 @@ abstract class StepDanceExample {
     if (resultsJSON.getResponseStatus == 200) {
       val results = resultsJSON.getResponseData.getResults
       buildSteps(results)
-        .finishWith {
+        .closeWith {
       }.build()
     } else {
       println("Response code: " + resultsJSON.getResponseStatus + " Details: " + resultsJSON.getResponseDetails)
@@ -97,7 +97,7 @@ abstract class StepDanceExample {
       buildSteps {
         val line: String = input.readLine()
         if (line == null) null else (line, context)
-      }.finishWith {
+      }.closeWith {
         input.close()
       }.build()
     }

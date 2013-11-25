@@ -2,6 +2,7 @@ package com.avast.steps
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
+import java.io.Closeable
 
 object StepsBuilder {
 
@@ -67,7 +68,7 @@ object StepsBuilder {
       stepFactory(() => {})
     }
 
-    def finishWith(finisher: => Unit) = new BuilderStep3[T](stepFactory, () => finisher)
+    def closeWith(finisher: => Unit) = new BuilderStep3[T](stepFactory, () => finisher)
 
   }
 
@@ -85,7 +86,9 @@ object Step {
 
 }
 
-sealed trait Step[+T] {
+sealed trait Step[+T] extends Closeable {
+
+  def value: Option[T]
 
   def map[B](f: T => B): Step[B]
 
@@ -187,11 +190,11 @@ object NextStep {
           // we must finish the previous steps explicitly because the implicit behavior is triggered
           // for NoStep and FinalStep only while here we are possibly changing the step type
           nextStep.nextStepFn.finisher.finish()
-          NoStep.connect(connector)
+          connector(nextStep)
         }
         case fs: FinalStep[T] => {
           nextStep.nextStepFn.finisher.finish()
-          fs.connect(connector)
+          connector(fs)
         }
         case ns: NextStep[T] => connect(ns, connector)
       }
@@ -253,6 +256,12 @@ case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher) e
 }
 
 case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends Step[T] with HavingResult[T] {
+
+  def value: Option[T] = Some(result)
+
+  def close(): Unit = {
+    nextStepFn.finisher.finish()
+  }
 
   def map[B](mapper: (T) => B): Step[B] = {
     NextStep(NextStep.mappedFnGen(nextStepFn, mapper), mapper(result))
@@ -320,6 +329,11 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
 }
 
 case class FinalStep[+T](result: T) extends Step[T] with HavingResult[T] {
+
+  def value: Option[T] = Some(result)
+
+  def close(): Unit = {}
+
   def map[B](mapper: (T) => B): Step[B] = FinalStep(mapper(result))
 
   def flatMap[B](f: (T) => Step[B]): Step[B] = f(result)
@@ -349,6 +363,10 @@ case class FinalStep[+T](result: T) extends Step[T] with HavingResult[T] {
 }
 
 case object NoStep extends Step[Nothing] {
+
+  def value: Option[Nothing] = None
+
+  def close(): Unit = {}
 
   def map[B](f: (Nothing) => B) = this
 
