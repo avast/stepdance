@@ -11,7 +11,7 @@ class IteratorProblems extends StepDanceExample {
 
   def uglyIteratorAdapter() {
 
-    class SomeRecord()
+    class SomeRecord(data1: String, data2: Int)
 
     trait SomeIteratorLike {
       def nextRecord(): SomeRecord
@@ -61,6 +61,8 @@ class IteratorProblems extends StepDanceExample {
     }
     finally {
       // How to close the open files?
+      // Chaining closable iterators without some connection management is
+      // a bad idea
       // (scala-arm solves it)
     }
 
@@ -73,6 +75,9 @@ class IteratorProblems extends StepDanceExample {
       })
     try {
       for (c <- fileSource) {
+        // This block is a function called from within the foreach method.
+        // Unlike the traditional FOR loop in C or Java it is enclosed.
+        if (c == ' ') throw new IllegalStateException("Unexpected character")
         print(c)
       }
     }

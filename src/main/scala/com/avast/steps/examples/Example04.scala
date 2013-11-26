@@ -13,9 +13,11 @@ class Example04 extends StepDanceExample {
    */
   def example() {
     val scanner = openScanner(source)
-      .connect(ll => if (ll.value == Some("--------")) {
-      openScanner(source2)
-    } else NoStep)
+      .connect(lastStep => {
+      if (Some("--------") == lastStep.value)
+        openScanner(source2)
+      else NoStep
+    })
 
     for (line <- scanner) {
       println(line)

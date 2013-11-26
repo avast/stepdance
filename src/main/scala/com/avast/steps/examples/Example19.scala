@@ -26,7 +26,7 @@ class Example19 extends StepDanceExample {
       try {
         //println("Opening (level " + maxDepth + ") " + source)
         Some(new BufferedReader(new InputStreamReader(
-            new URL(source).openStream())))
+          new URL(source).openStream())))
       }
       catch {
         case t: Throwable => {
@@ -43,15 +43,12 @@ class Example19 extends StepDanceExample {
         line match {
           case null => NoStep
           case LinksExtractor(urls) if maxDepth > 0 => {
-            // current line + sub-scanners + return
-            FinalStep(line).connect(_ => {
-              // Create the sub-scanners
-              (for (url <- urls;
-                    subScanner <- WebCrawler(url, maxDepth - 1)())
-              yield subScanner)
-                // append a step returning us to the current level
-                .connect(_ => NextStep(this, line, input.close()))
-            })
+            // sub-scanners + the "return" step
+            (for (url <- urls;
+                  subScanner <- WebCrawler(url, maxDepth - 1)())
+            yield subScanner)
+              // append a step returning us to the current level
+              .connect(_ => NextStep(this, line, input.close()))
           }
           case _ => {
             NextStep(this, line, input.close())

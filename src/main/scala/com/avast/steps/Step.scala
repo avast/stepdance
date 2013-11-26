@@ -256,7 +256,7 @@ object NextStep {
           // we must finish the previous steps explicitly because the implicit behavior is triggered
           // for NoStep and FinalStep only while here we are possibly changing the step type
           nextStep.nextStepFn.finisher.finish()
-          NoStep.connect(connector)
+          connector(nextStep)
         }
         case fs: FinalStep[T] => {
           nextStep.nextStepFn.finisher.finish()

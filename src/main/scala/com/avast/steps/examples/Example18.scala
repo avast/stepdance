@@ -15,6 +15,9 @@ class Example18 extends StepDanceExample {
 
     // A stateless (functional) alternative to an iterator
     // See bellow to the traditional Iterator approach
+    // In contrast to Iterator, we have to implement only one method,
+    // also the code is more concise.
+    // Yet, there is no state (except the input reader)!
     val scanner = new (() => Step[String]) {
       lazy val input = new BufferedReader(
         new FileReader(sourceFile))
