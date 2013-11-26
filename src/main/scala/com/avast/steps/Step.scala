@@ -7,6 +7,8 @@ sealed trait Step[+T] extends Closeable {
 
   def value: Option[T]
 
+  def close(): Unit
+
   def map[B](f: T => B): Step[B]
 
   def flatMap[B](f: T => Step[B]): Step[B]
