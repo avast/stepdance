@@ -6,6 +6,7 @@ import com.avast.steps.StepsBuilder._
 /**
  * StepDance: Basic Usage
  */
+
 class Example02 extends StepDanceExample {
 
   /**

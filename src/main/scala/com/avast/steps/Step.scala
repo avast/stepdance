@@ -23,6 +23,8 @@ sealed trait Step[+T] extends Closeable {
 
   def stopAt(stopper: T => Boolean): Step[T]
 
+  def toIterator: Iterator[T] with Closeable = new StepIterator[T](this)
+
   // other methods are to come ...
 }
 
@@ -317,4 +319,32 @@ case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher) e
     }
     step
   }
+
 }
+
+class StepIterator[T](firstStep: Step[T]) extends Iterator[T] with Closeable {
+
+  private[this] var step: Step[T] = firstStep
+
+  def close() {
+    step.close()
+  }
+
+  def hasNext: Boolean = step match {
+    case NoStep => false
+    case FinalStep(_) => true
+    case NextStep(_, _) => true
+  }
+
+  def next(): T = {
+    step match {
+      case NoStep => throw new NoSuchElementException
+      case FinalStep(result) => result
+      case NextStep(nextStepFn, result) => {
+        step = nextStepFn()
+        result
+      }
+    }
+  }
+}
+
