@@ -20,7 +20,7 @@ class Example17 extends StepDanceExample {
       ) yield pageLine
 
     for (line <- lines) {
-      println(line._2.get.getAuthor + ": " + line._1)
+      println(line._2.get.getPostUrl + ": " + line._1)
     }
 
   }

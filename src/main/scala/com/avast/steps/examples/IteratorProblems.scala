@@ -3,9 +3,13 @@ package com.avast.steps.examples
 import scala.io.{BufferedSource, Source}
 
 /**
- * User: zslajchrt
- * Date: 11/25/13
- * Time: 10:15 PM
+ * Iterators are mostly stateful, tend to be complex state machines,
+ * with confused, chaotic states.
+ * Method hasNext often contains almost the whole iterator logic,
+ * unexpectedly, as it is idempotent (and it is a plain getter,
+ * that are supposed to be simple method)
+ * On the other hand, the next method is often very simple, although
+ * non-idempotent.
  */
 class IteratorProblems extends StepDanceExample {
 
