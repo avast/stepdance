@@ -5,7 +5,7 @@ import java.io.{InputStreamReader, BufferedReader}
 import java.net.URL
 
 /**
- * Advanced Use - Using Step API directly
+ * Advanced Use - Using StepDance API directly
  */
 class Example19 extends StepDanceExample {
 
@@ -13,23 +13,19 @@ class Example19 extends StepDanceExample {
    * a web crawler
    */
   def example() {
-
-    val scanner = Scanner("http://www.novinky.cz", 4)
-
+    val scanner = WebCrawler("http://www.novinky.cz", 4)
     for (line <- scanner() if line.contains("Babiš")) {
       println(line)
     }
-
   }
 
-  case class Scanner(source: String, maxDepth: Int)
+  case class WebCrawler(source: String, maxDepth: Int)
     extends (() => Step[String]) {
 
     lazy val inputOpt = {
       try {
         //println("Opening (level " + maxDepth + ") " + source)
-        Some(new BufferedReader(
-          new InputStreamReader(
+        Some(new BufferedReader(new InputStreamReader(
             new URL(source).openStream())))
       }
       catch {
@@ -42,7 +38,6 @@ class Example19 extends StepDanceExample {
 
     def apply(): Step[String] = inputOpt match {
       case None => NoStep
-
       case Some(input) => {
         val line: String = input.readLine()
         line match {
@@ -52,9 +47,9 @@ class Example19 extends StepDanceExample {
             FinalStep(line).connect(_ => {
               // Create the sub-scanners
               (for (url <- urls;
-                    subScanner <- Scanner(url, maxDepth - 1)())
+                    subScanner <- WebCrawler(url, maxDepth - 1)())
               yield subScanner)
-                // return to this level
+                // append a step returning us to the current level
                 .connect(_ => NextStep(this, line, input.close()))
             })
           }

@@ -7,7 +7,6 @@ package com.avast.steps.examples
  * Time: 9:03 PM
  */
 object StepDanceExamples {
-
   val examples = List(
     new Example00,
     new Example01,
@@ -37,7 +36,8 @@ object StepDanceExamples {
     if (exNum >= 0 && exNum < examples.size) {
       examples(exNum).example()
     } else {
-      print("Invalid example number. 0-" + (examples.size - 1))
+      new IteratorProblems().example()
+      //print("Invalid example number. 0-" + (examples.size - 1))
     }
   }
 

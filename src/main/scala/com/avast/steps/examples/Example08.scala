@@ -10,7 +10,7 @@ class Example08 extends StepDanceExample {
    */
   def example() {
     val scanner = openScanner(source)
-      .fold((-1, ""))((len, line) => (len._1 + 1, line))
+      .foldLeft((-1, ""))((len, line) => (len._1 + 1, line))
 
     for (line <- scanner) {
       println(line._1 + ":" + line._2)

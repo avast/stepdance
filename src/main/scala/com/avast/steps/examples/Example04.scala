@@ -9,19 +9,17 @@ import com.avast.steps.NoStep
 class Example04 extends StepDanceExample {
 
   /**
-   * Connecting steps
+   * Connecting steps conditionally
    */
   def example() {
     val scanner = openScanner(source)
-      .connect(s => if (s.value == Some("--------")) {
+      .connect(ll => if (ll.value == Some("--------")) {
       openScanner(source2)
     } else NoStep)
-      .map("//" + _)
 
     for (line <- scanner) {
       println(line)
     }
   }
-
 
 }

@@ -1,13 +1,13 @@
 package com.avast.steps.examples
 
-import scala.io.Source
+import scala.io.{BufferedSource, Source}
 
 /**
  * User: zslajchrt
  * Date: 11/25/13
  * Time: 10:15 PM
  */
-class UsingIterator extends StepDanceExample {
+class IteratorProblems extends StepDanceExample {
 
   def uglyIteratorAdapter() {
 
@@ -17,7 +17,8 @@ class UsingIterator extends StepDanceExample {
       def nextRecord(): SomeRecord
     }
 
-    // UGLY iterator adapter, I must write it for every proprietary iterator
+    // UGLY iterator adapter, I must write it for every
+    // proprietary iterator
     class SomeIterator(likeIter: SomeIteratorLike)
       extends Iterator[SomeRecord] {
 
@@ -43,7 +44,7 @@ class UsingIterator extends StepDanceExample {
       }
     }
 
-    // Only now I can enjoy easy working with the iterator
+    // Only now I can enjoy how easy working with the iterator is
   }
 
   def unableToCloseSources() {
@@ -65,7 +66,22 @@ class UsingIterator extends StepDanceExample {
 
   }
 
-  def decoration() {
+  def closingIsNotAutomaticInSource() {
+    val fileSource: BufferedSource =
+      Source.fromFile(sourceFile).withClose(() => {
+        println("CLOSED")
+      })
+    try {
+      for (c <- fileSource) {
+        print(c)
+      }
+    }
+    finally {
+      fileSource.close()
+    }
+  }
+
+  def decorationIsUnwieldy() {
     //*** The producer side
     val scanner: Iterator[String] = Source.fromFile(sourceFile).getLines()
 
@@ -84,7 +100,7 @@ class UsingIterator extends StepDanceExample {
       }
     }
 
-    // Another ugly iterator again (not so ugly now)
+    // Another ugly iterator again (although not so ugly now)
 
   }
 
@@ -93,14 +109,17 @@ class UsingIterator extends StepDanceExample {
      * Problem:
      * In case of error we need to either skip the current iterator
      * or continue with another iterator
-     * Solution: Can be solved by a decorating fail-over iterator (could be designed universal)
+     * Solution: Can be solved by a decorating fail-over iterator
+     * (could be designed universally)
      */
   }
 
   def connectingIteratorsConditionally() {
     /**
-     * Problem: We want to continue to iterate with another iterator as long as
-     * 1) a certain condition occurs during the first iteration (exceeding the calculated total size)
+     * Problem: We want to continue to iterate with another iterator
+     * as long as
+     * 1) a certain condition occurs during the first iteration
+     * (e.g. exceeding the calculated total size)
      * 2) the last value of the first iterator ends with a certain value
      */
   }
@@ -108,17 +127,22 @@ class UsingIterator extends StepDanceExample {
   def lazyFolding() {
     /**
      * foldLeft/Right traverses the iterator
-     * I sometimes need to aggregate values and propagate them during the iteration. They can be
-     * taken into account when deciding whether to continue
-     * - see Example 8 - calculating line numbers to lines
+     * Sometimes I need to aggregate values and propagate them
+     * during the iteration. They can be taken into account
+     * when deciding whether to continue or not
+     * See Example 8 - calculating line numbers to lines
      */
   }
 
   def nonDeterministicRecursiveIterators() {
-    // I can have an iterator with tree-traversal behavior (a tree walker)
-    // See Example 19 - web crawler
+    /**
+     * I can have an iterator with tree-traversal behavior (a tree walker)
+     * with no predefined depth of recursion
+     * See Example 19 - the web crawler
+     */
   }
 
   def example(): Unit = {
+    closingIsNotAutomaticInSource()
   }
 }

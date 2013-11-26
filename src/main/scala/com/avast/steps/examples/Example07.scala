@@ -10,7 +10,7 @@ class Example07 extends StepDanceExample {
    */
   def example() {
     val scanner = openScanner(source)
-      .withFilter(_.contains("def"))
+      .withFilter(_.contains("Henry"))
 
     for (line <- scanner) {
       println(line)

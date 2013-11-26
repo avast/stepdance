@@ -8,7 +8,7 @@ import com.avast.steps.StepsBuilder._
 class Example15 extends StepDanceExample {
 
   /**
-   * chaining flatMaps
+   * Chaining flatMaps
    */
   def example() {
     val scanner = for (src <- steps(webSites);
@@ -20,6 +20,5 @@ class Example15 extends StepDanceExample {
       println(link)
     }
   }
-
 
 }

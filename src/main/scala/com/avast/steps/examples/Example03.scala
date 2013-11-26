@@ -9,24 +9,23 @@ import com.avast.steps.StepsBuilder._
 class Example03 extends StepDanceExample {
 
   /**
-   * Decoration of the step functions
+   * Step functions decoration
    */
   def example() {
-    // create a lazy scanner
     var counter: Long = 0
-    lazy val input = new BufferedReader(new FileReader(sourceFile))
+    lazy val input =
+      new BufferedReader(new FileReader(sourceFile))
+
     val scanner = buildSteps {
       input.readLine()
     }.closeWith {
       input.close()
       println("Closed")
-    }.build()
-      .decorate(decorStepFn => {
+    }.build().decorate(decorStepFn => {
       counter += 1
       decorStepFn()
     })
 
-    // scan
     for (line <- scanner) {
       println(line)
     }

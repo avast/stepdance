@@ -6,11 +6,11 @@ package com.avast.steps.examples
 class Example10 extends StepDanceExample {
 
   /**
-   * Ignoring first N steps and stopping after M steps
+   * Ignoring the first N steps and stopping after M steps
    */
   def example() {
     val scanner = openScanner(source)
-      .fold((-1, ""))((len, line) => (len._1 + 1, line))
+      .foldLeft((-1, ""))((len, line) => (len._1 + 1, line))
       .withFilter(_._1 > 3)
       .stopAt(_._1 == 10)
 

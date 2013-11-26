@@ -14,7 +14,6 @@ class Example05 extends StepDanceExample {
     val scanner = openScanner(source)
       .connect(_ => steps(List("******************")))
       .connect(_ => openScanner(source2))
-      .map("//" + _)
 
     for (line <- scanner) {
       println(line)

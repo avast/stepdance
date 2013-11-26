@@ -6,6 +6,7 @@ import com.avast.steps.StepsBuilder._
  * Monadic Character & For Loop
  */
 class Example16 extends StepDanceExample {
+  import LinksExtractor._
 
   /**
    * chaining flatMaps with a filter
@@ -13,7 +14,7 @@ class Example16 extends StepDanceExample {
   def example() {
     val scanner = for (src <- steps(webSites);
                        pageLine <- openScanner(src);
-                       link <- LinksExtractor.extractLinks(pageLine);
+                       link <- extractLinks(pageLine);
                        line <- openScanner(link)
                        if line.contains("Zeman")
                          || line.contains("Babiš")

@@ -9,11 +9,13 @@ import com.avast.steps.StepsBuilder._
 class Example02 extends StepDanceExample {
 
   /**
-   * An illustration of transforming the step results by means of the map method
+   * An illustration of transforming the step results
+   * by means of the map method
    */
   def example() {
-    // create a lazy scanner
-    lazy val input = new BufferedReader(new FileReader(sourceFile))
+    lazy val input =
+      new BufferedReader(new FileReader(sourceFile))
+
     val scanner = buildSteps {
       input.readLine()
     }.closeWith {
@@ -21,7 +23,6 @@ class Example02 extends StepDanceExample {
       println("Closed")
     }.build().map("//" + _)
 
-    // scan
     for (line <- scanner) {
       println(line)
     }
