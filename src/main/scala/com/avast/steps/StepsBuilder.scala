@@ -1,6 +1,7 @@
 package com.avast.steps
 
 import scala.collection.JavaConversions._
+import scala._
 
 /**
  * User: zslajchrt
@@ -9,25 +10,27 @@ import scala.collection.JavaConversions._
  */
 object StepsBuilder {
 
-  def steps[T >: Null](rawStepFn: => T) = steps_(rawStepFn, () => {})
+  val defaultErrorHandler: PartialFunction[Throwable, Unit] = { case t => throw t }
 
-  def steps[T](iterable: java.lang.Iterable[T]) = steps_(iterable.iterator, () => {})
+  def steps[T >: Null](rawStepFn: => T) = steps_(rawStepFn, () => {}, defaultErrorHandler)
 
-  def steps[T](iterable: Iterator[T]) = steps_(asJavaIterator(iterable), () => {})
+  def steps[T](iterable: java.lang.Iterable[T]) = steps_(iterable.iterator, () => {}, defaultErrorHandler)
 
-  def steps[T](iterable: Iterable[T]) = steps_(asJavaIterator(iterable.iterator), () => {})
+  def steps[T](iterable: Iterator[T]) = steps_(asJavaIterator(iterable), () => {}, defaultErrorHandler)
 
-  def steps[T](iterator: java.util.Iterator[T]) = steps_(iterator, () => {})
+  def steps[T](iterable: Iterable[T]) = steps_(asJavaIterator(iterable.iterator), () => {}, defaultErrorHandler)
 
-  def buildSteps[T >: Null](rawStepFn: => T) = new BuilderStep2[T](steps_(rawStepFn, _))
+  def steps[T](iterator: java.util.Iterator[T]) = steps_(iterator, () => {}, defaultErrorHandler)
 
-  def buildSteps[T](iterable: java.lang.Iterable[T]) = new BuilderStep2[T](steps_(iterable.iterator, _))
+  def buildSteps[T >: Null](rawStepFn: => T) = new BuilderStep2[T](steps_(rawStepFn, _, _))
 
-  def buildSteps[T](iterable: Iterator[T]) = new BuilderStep2[T](steps_(asJavaIterator(iterable), _))
+  def buildSteps[T](iterable: java.lang.Iterable[T]) = new BuilderStep2[T](steps_(iterable.iterator, _, _))
 
-  def buildSteps[T](iterable: Iterable[T]) = new BuilderStep2[T](steps_(asJavaIterator(iterable.iterator), _))
+  def buildSteps[T](iterable: Iterator[T]) = new BuilderStep2[T](steps_(asJavaIterator(iterable), _, _))
 
-  def buildSteps[T](iterator: java.util.Iterator[T]) = new BuilderStep2[T](steps_(iterator, _))
+  def buildSteps[T](iterable: Iterable[T]) = new BuilderStep2[T](steps_(asJavaIterator(iterable.iterator), _, _))
+
+  def buildSteps[T](iterator: java.util.Iterator[T]) = new BuilderStep2[T](steps_(iterator, _, _))
 
   /**
    * Creates a step function from another function returning null as the indicator of the end. The final step returned
@@ -36,8 +39,9 @@ object StepsBuilder {
    * @tparam T the type of the result element
    * @return the step function built from the raw step function
    */
-  private def steps_[T >: Null](rawStepFn: => T, finisher: () => Unit): Step[T] = {
-    val fin = Finisher(finisher)
+  private def steps_[T >: Null](rawStepFn: => T, finisher: () => Unit,
+                                errorHandler: PartialFunction[Throwable, Unit]): Step[T] = {
+    val fin = Finisher(finisher, errorHandler)
     def doStep(): Step[T] = rawStepFn match {
       case null => NoStep
       case line => NextStep(CloseableStepFunction(doStep, fin), line)
@@ -45,8 +49,9 @@ object StepsBuilder {
     doStep()
   }
 
-  private def steps_[T](iterator: java.util.Iterator[T], finisher: () => Unit): Step[T] = {
-    val fin = Finisher(finisher)
+  private def steps_[T](iterator: java.util.Iterator[T], finisher: () => Unit,
+                        errorHandler: PartialFunction[Throwable, Unit]): Step[T] = {
+    val fin = Finisher(finisher, errorHandler)
     def doStep(): Step[T] = {
       if (iterator.hasNext) {
         val t = iterator.next()
@@ -61,23 +66,43 @@ object StepsBuilder {
       }
     }
 
-    doStep()
+    try {
+      doStep()
+    }
+    catch {
+      case t: Throwable => {
+        errorHandler(t)
+        NoStep
+      }
+    }
   }
 
-  class BuilderStep2[T](stepFactory: (() => Unit) => Step[T]) {
+  class BuilderStep2[T](stepFactory: (() => Unit, PartialFunction[Throwable, Unit]) => Step[T]) {
 
     def build() = {
-      stepFactory(() => {})
+      stepFactory(() => {}, defaultErrorHandler)
     }
 
-    def closeWith(finisher: => Unit) = new BuilderStep3[T](stepFactory, () => finisher)
+    def handleErrorsWith(errorHandler: PartialFunction[Throwable, Unit]) = new BuilderStep3[T](stepFactory, errorHandler)
+
+    def closeWith(finisher: => Unit) = new BuilderStep4[T](stepFactory, () => finisher, defaultErrorHandler)
+  }
+
+  class BuilderStep3[T](stepFactory: (() => Unit, PartialFunction[Throwable, Unit]) => Step[T], errorHandler: PartialFunction[Throwable, Unit]) {
+
+    def build() = {
+      stepFactory(() => {}, errorHandler)
+    }
+
+    def closeWith(finisher: => Unit) = new BuilderStep4[T](stepFactory, () => finisher, errorHandler)
 
   }
 
-  class BuilderStep3[T](stepFactory: (() => Unit) => Step[T], finisher: () => Unit) {
+  class BuilderStep4[T](stepFactory: (() => Unit, PartialFunction[Throwable, Unit]) => Step[T], finisher: () => Unit,
+                        errorHandler: PartialFunction[Throwable, Unit]) {
 
     def build() = {
-      stepFactory(finisher)
+      stepFactory(finisher, errorHandler)
     }
 
   }

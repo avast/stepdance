@@ -26,11 +26,22 @@ abstract class StepDanceExample {
 
   def example()
 
-  def openScanner(source: String) = {
+  def openScanner(source: String, errorProne: Boolean = true) = {
     try {
       lazy val input = new BufferedReader(new InputStreamReader(new URL(source).openStream()))
       buildSteps {
-        input.readLine()
+        val line: String = input.readLine()
+        if (line == "")
+          throw new RuntimeException("EXCEPTION")
+        line
+      }.handleErrorsWith {
+        case t: Throwable => {
+          if (errorProne) {
+            t.printStackTrace()
+          } else {
+            throw t
+          }
+        }
       }.closeWith {
         input.close()
       }.build()

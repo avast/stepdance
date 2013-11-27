@@ -2,6 +2,7 @@ package com.avast.steps
 
 import scala.annotation.tailrec
 import java.io.Closeable
+import scala.PartialFunction
 
 sealed trait Step[+T] extends Closeable {
 
@@ -55,7 +56,7 @@ case object NoStep extends Step[Nothing] {
   def stopAt(stopper: Nothing => Boolean): Step[Nothing] = this
 }
 
-trait HavingResult[+T] extends Step[T] {
+sealed trait HavingResult[+T] extends Step[T] {
   val result: T
 }
 
@@ -127,7 +128,7 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
   }
 
   def foreach[U](f: (T) => U): Unit = {
-    NextStep.iterate(this, f)
+    NextStep.iterate(this, f, nextStepFn.finisher)
   }
 
   def withFilter(condition: (T) => Boolean): Step[T] = {
@@ -168,31 +169,41 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
 
 object NextStep {
 
-  def apply[T](stepFn: () => Step[T], stepValue: T, finisher: => Unit = () => {}): NextStep[T] = {
-    NextStep(CloseableStepFunction(stepFn, new Finisher(() => finisher)), stepValue)
-  }
-
-  def safeFn[T, U](f: (T) => U, owningStep: Step[T]): (T) => U = (t) => {
-    try {
-      f(t)
-    }
-    catch {
-      case t: Throwable => {
-        owningStep.close()
-        throw t
-      }
-    }
+  def apply[T](stepFn: () => Step[T], stepValue: T, finisher: => Unit = () => {},
+               errorHandler: PartialFunction[Throwable, Unit] = {
+                 case t => throw t
+               }): NextStep[T] = {
+    NextStep(CloseableStepFunction(stepFn, new Finisher(() => finisher, errorHandler)), stepValue)
   }
 
   @tailrec
-  private[steps] def iterate[T, U](step: Step[T], f: (T) => U) {
-    val safe = safeFn(f, step)
+  private[steps] def iterate[T, U](step: Step[T], f: (T) => U, fin: Finisher) {
+
+    lazy val safe = (value: T) => {
+      try {
+        f(value)
+      }
+      catch {
+        case t: Throwable => {
+          try {
+            fin.handleError(t)
+          }
+          catch {
+            case tt: Throwable => {
+              fin.finish()
+              throw tt
+            }
+          }
+        }
+      }
+    }
+
     step match {
       case NoStep =>
       case FinalStep(res) => safe(res)
       case NextStep(nfn, res) => {
         safe(res)
-        iterate(nfn(), f)
+        iterate(nfn(), f, nfn.finisher)
       }
     }
   }
@@ -221,7 +232,7 @@ object NextStep {
         val NextStep(nextStepFn, result) = ns
         binder(result) match {
           case ns2: NextStep[B] => ns.decorateFlattenedStep(ns2, binder)
-          case FinalStep(res) => NextStep(CloseableStepFunction(() => nextStepFn().flatMap(binder), nextStepFn.finisher), res)
+          case FinalStep(res) => NextStep[B](CloseableStepFunction(() => nextStepFn().flatMap(binder), nextStepFn.finisher), res)
           case NoStep => flatMap(nextStepFn(), binder)
         }
       }
@@ -252,7 +263,7 @@ object NextStep {
 
   private[steps] def connect[T, S >: T](nextStep: NextStep[T], connector: (Step[T]) => Step[S]): NextStep[S] = {
     val conDecorFn: () => Step[S] = () => {
-      val step: Step[T] = nextStep.nextStepFn.stepFn()
+      val step: Step[T] = nextStep.nextStepFn()
       step match {
         case NoStep => {
           // we must finish the previous steps explicitly because the implicit behavior is triggered
@@ -273,27 +284,32 @@ object NextStep {
 
 }
 
-object Finisher extends Finisher(() => {})
+object Finisher extends Finisher(() => {}, {
+  case t => throw t
+})
 
-case class Finisher(finisherFn: () => Unit) {
+case class Finisher(finisherFn: () => Unit, errorHandler: PartialFunction[Throwable, Unit]) {
 
   private[this] var called = false
 
-  //  def handleError(t: Throwable) {
-  //    finish()
-  //  }
+  def finish(): Unit = {
+    if (!called) {
+      try {
+        finisherFn()
+      } finally {
+        called = true
+      }
+    }
+  }
 
-  def finish(): Unit = if (!called) {
-    try {
-      finisherFn()
-    }
-    finally {
-      called = true
-    }
+  def handleError(t: Throwable): Unit = {
+    errorHandler(t)
   }
 }
 
-case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher) extends (() => Step[T]) {
+case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher)
+  extends (() => Step[T]) {
+
   override def apply(): Step[T] = {
     val step: Step[T] = try {
       stepFn()
@@ -301,13 +317,18 @@ case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher) e
     catch {
       case t: Throwable => {
         try {
-          //finisher.handleError(t)
-          finisher.finish()
+          // the error handler can return a new step or re-throw the exception
+          try {
+            finisher.handleError(t)
+            NoStep
+          }
+          catch {
+            case tt: Throwable => {
+              finisher.finish()
+              throw tt
+            }
+          }
         }
-        catch {
-          case tt: Throwable => tt.printStackTrace()
-        }
-        throw t
       }
     }
     step match {
@@ -317,7 +338,7 @@ case class CloseableStepFunction[T](stepFn: () => Step[T], finisher: Finisher) e
       case FinalStep(_) => {
         finisher.finish()
       }
-      case _ =>
+      case ns: NextStep[T] =>
     }
     step
   }

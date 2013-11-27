@@ -13,7 +13,7 @@ class Example15 extends StepDanceExample {
   def example() {
     val scanner = for (src <- steps(webSites);
                        pageLine <- openScanner(src);
-                       link <- LinksExtractor.extractLinks(pageLine))
+                       link <- LinksExtractor.extractLinks(pageLine) if !link.contains("lidovky"))
     yield link
 
     for (link <- scanner) {
