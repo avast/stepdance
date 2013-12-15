@@ -10,7 +10,9 @@ import scala._
  */
 object StepsBuilder {
 
-  val defaultErrorHandler: PartialFunction[Throwable, Unit] = { case t => throw t }
+  val defaultErrorHandler: PartialFunction[Throwable, Unit] = {
+    case t => throw t
+  }
 
   def steps[T >: Null](rawStepFn: => T) = steps_(rawStepFn, () => {}, defaultErrorHandler)
 
@@ -25,6 +27,8 @@ object StepsBuilder {
   def buildSteps[T >: Null](rawStepFn: => T) = new BuilderStep2[T](steps_(rawStepFn, _, _))
 
   def buildSteps[T](iterable: java.lang.Iterable[T]) = new BuilderStep2[T](steps_(iterable.iterator, _, _))
+
+  def buildSteps[T](step: Step[T]) = new BuilderStep2[T](steps_(step, _, _))
 
   def buildSteps[T](iterable: Iterator[T]) = new BuilderStep2[T](steps_(asJavaIterator(iterable), _, _))
 
@@ -42,37 +46,78 @@ object StepsBuilder {
   private def steps_[T >: Null](rawStepFn: => T, finisher: () => Unit,
                                 errorHandler: PartialFunction[Throwable, Unit]): Step[T] = {
     val fin = Finisher(finisher, errorHandler)
-    def doStep(): Step[T] = rawStepFn match {
-      case null => NoStep
-      case line => NextStep(CloseableStepFunction(doStep, fin), line)
+
+    manageErrors(fin) {
+
+      def doStep(): Step[T] = rawStepFn match {
+        case null => NoStep
+        case line => NextStep(CloseableStepFunction(doStep, fin), line)
+      }
+      doStep()
+
     }
-    doStep()
+
+  }
+
+  private def decorateSteps[T](stepFn: () => Step[T], newFinisher: Finisher)(): Step[T] = stepFn() match {
+    case NoStep => NoStep
+    case fs: FinalStep[T] => fs
+    case ns: NextStep[T] => {
+      //val newFin = ns.nextStepFn.finisher.compose(newFinisher)
+      val newNextFn = CloseableStepFunction(decorateSteps(ns.nextStepFn.stepFn, newFinisher), newFinisher)
+      val decNextStep: NextStep[T] = NextStep(newNextFn, ns.result)
+      decNextStep
+    }
+  }
+
+  private def steps_[T](step: Step[T], finisher: () => Unit,
+                        errorHandler: PartialFunction[Throwable, Unit]): Step[T] = {
+    step match {
+      case ns: NextStep[T] => {
+        val newFin = ns.nextStepFn.finisher.compose(Finisher(finisher, errorHandler))
+        decorateSteps(() => step, newFin)()
+      }
+      case _ => step
+    }
   }
 
   private def steps_[T](iterator: java.util.Iterator[T], finisher: () => Unit,
                         errorHandler: PartialFunction[Throwable, Unit]): Step[T] = {
     val fin = Finisher(finisher, errorHandler)
-    def doStep(): Step[T] = {
-      if (iterator.hasNext) {
-        val t = iterator.next()
-        if (iterator.hasNext) {
-          NextStep(CloseableStepFunction(doStep, fin), t)
-        } else {
-          fin.finish()
-          FinalStep(t)
-        }
-      } else {
-        NoStep
-      }
-    }
 
-    try {
+    manageErrors(fin) {
+
+      def doStep(): Step[T] = {
+        if (iterator.hasNext) {
+          val t = iterator.next()
+          if (iterator.hasNext) {
+            NextStep(CloseableStepFunction(doStep, fin), t)
+          } else {
+            fin.finish()
+            FinalStep(t)
+          }
+        } else {
+          NoStep
+        }
+      }
+
       doStep()
+
+    }
+  }
+
+  private[steps] def manageErrors[B](finisher: Finisher)(action: => Step[B]): Step[B] = {
+    try {
+      action
     }
     catch {
       case t: Throwable => {
-        errorHandler(t)
-        NoStep
+        try {
+          finisher.handleError(t)
+          NoStep
+        } finally {
+          finisher.finish()
+        }
       }
     }
   }

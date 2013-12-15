@@ -1,0 +1,13 @@
+
+The Iterator Pattern Obsolete?
+------------------------------
+
+One of the simplest interfaces in Java with two pretty self-descriptive methods (omitting 'remove') offers
+a very simple contract between the user and the iterator. The contract for reading data from an iterator could be put
+this way: "Call 'hasNext' to inquire if I have anything for you. If so, you can get it by calling 'next'". Even a Java
+newbie has no problem to understand the contract and follow it - knowing how the 'while' loop works is enough.
+So far, so good.
+
+
+
+

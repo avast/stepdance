@@ -3,12 +3,11 @@ package com.avast.steps
 import scala.annotation.tailrec
 import java.io.Closeable
 import scala.PartialFunction
+import scala.runtime.AbstractPartialFunction
 
-sealed trait Step[+T] extends Closeable {
+sealed trait Step[+T] {
 
   def value: Option[T]
-
-  def close(): Unit
 
   def map[B](f: T => B): Step[B]
 
@@ -28,14 +27,11 @@ sealed trait Step[+T] extends Closeable {
 
   def toIterator: Iterator[T] with Closeable = new StepIterator[T](this)
 
-  // other methods are to come ...
 }
 
 case object NoStep extends Step[Nothing] {
 
   def value: Option[Nothing] = None
-
-  def close(): Unit = {}
 
   def map[B](f: (Nothing) => B) = this
 
@@ -63,8 +59,6 @@ sealed trait HavingResult[+T] extends Step[T] {
 case class FinalStep[+T](result: T) extends Step[T] with HavingResult[T] {
 
   def value: Option[T] = Some(result)
-
-  def close(): Unit = {}
 
   def map[B](mapper: (T) => B): Step[B] = FinalStep(mapper(result))
 
@@ -102,11 +96,25 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
     nextStepFn.finisher.finish()
   }
 
-  def map[B](mapper: (T) => B): Step[B] = {
-    NextStep(NextStep.mappedFnGen(nextStepFn, mapper), mapper(result))
+  private def manageErrors[B](action: => Step[B]): Step[B] = StepsBuilder.manageErrors(nextStepFn.finisher)(action)
+
+  def map[B](mapper: (T) => B): Step[B] = manageErrors {
+    try {
+      NextStep(NextStep.mappedFnGen(nextStepFn, mapper), mapper(result))
+    }
+    catch {
+      case t: Throwable => {
+        try {
+          nextStepFn.finisher.handleError(t)
+          NoStep
+        } finally {
+          nextStepFn.finisher.finish()
+        }
+      }
+    }
   }
 
-  def flatMap[B](binder: (T) => Step[B]): Step[B] = {
+  def flatMap[B](binder: (T) => Step[B]): Step[B] = manageErrors {
     NextStep.flatMap(this, binder)
   }
 
@@ -131,7 +139,7 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
     NextStep.iterate(this, f, nextStepFn.finisher)
   }
 
-  def withFilter(condition: (T) => Boolean): Step[T] = {
+  def withFilter(condition: (T) => Boolean): Step[T] = manageErrors {
     NextStep.swallow(this, condition) match {
       case NoStep => NoStep
       case fs: FinalStep[T] => fs
@@ -143,20 +151,22 @@ case class NextStep[T](nextStepFn: CloseableStepFunction[T], result: T) extends 
     }
   }
 
-  def foldLeft[S](initial: S)(folder: (S, T) => S): Step[S] = {
+  def foldLeft[S](initial: S)(folder: (S, T) => S): Step[S] = manageErrors {
     val foldedResult = folder(initial, result)
     NextStep[S](NextStep.foldingFn(nextStepFn, folder, foldedResult), foldedResult)
   }
 
-  def connect[S >: T](connector: (Step[T]) => Step[S]): Step[S] = NextStep.connect(this, connector)
+  def connect[S >: T](connector: (Step[T]) => Step[S]): Step[S] = manageErrors {
+    NextStep.connect(this, connector)
+  }
 
-  def decorate[S >: T](decorator: (() => Step[S]) => Step[S]): Step[S] = {
+  def decorate[S >: T](decorator: (() => Step[S]) => Step[S]): Step[S] = manageErrors {
     NextStep[S](CloseableStepFunction[S](() => {
       decorator(nextStepFn).decorate(decorator)
     }, nextStepFn.finisher), result)
   }
 
-  def stopAt(stopper: T => Boolean): Step[T] = {
+  def stopAt(stopper: T => Boolean): Step[T] = manageErrors {
     if (stopper(result)) {
       FinalStep(result)
     } else {
@@ -292,6 +302,42 @@ case class Finisher(finisherFn: () => Unit, errorHandler: PartialFunction[Throwa
 
   private[this] var called = false
 
+  private [steps] def compose(other: Finisher) = {
+    val composedFin: () => Unit = () => {
+      try {
+        this.finish()
+      }
+      finally {
+        other.finish()
+      }
+    }
+
+    val composedErrHandler = new PartialFunction[Throwable, Unit] {
+      def isDefinedAt(t: Throwable): Boolean = {
+        errorHandler.isDefinedAt(t) || other.errorHandler.isDefinedAt(t)
+      }
+
+      def apply(t: Throwable) {
+        if (errorHandler.isDefinedAt(t)) {
+          try {
+            errorHandler(t)
+          }
+          catch {
+            case tt: Throwable => {
+              other.errorHandler(tt)
+            }
+          }
+        } else {
+          other.errorHandler(t)
+        }
+      }
+
+      override def toString(): String = "ComposedErrHandler"
+    }
+
+    Finisher(composedFin, composedErrHandler)
+  }
+
   def finish(): Unit = {
     if (!called) {
       try {
@@ -350,7 +396,10 @@ class StepIterator[T](firstStep: Step[T]) extends Iterator[T] with Closeable {
   private[this] var step: Step[T] = firstStep
 
   def close() {
-    step.close()
+    step match {
+      case ns: NextStep[T] => ns.close()
+      case _ =>
+    }
   }
 
   def hasNext: Boolean = step match {

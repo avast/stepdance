@@ -13,6 +13,11 @@ import scala.io.{BufferedSource, Source}
  */
 class IteratorProblems extends StepDanceExample {
 
+  def trailingNull() {
+
+  }
+
+
   def uglyIteratorAdapter() {
 
     class SomeRecord(data1: String, data2: Int)
